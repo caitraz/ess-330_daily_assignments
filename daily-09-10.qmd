@@ -1,0 +1,79 @@
+---
+title: "daily-09-10"
+author: "Caitlin Rasbid"
+date: "2025-03-02"
+format: html
+execute:
+  echo: true
+   
+---
+# Question 1
+```{r}
+data(airquality)
+?airquality
+```
+
+# Question 2
+```{r}
+library(visdat)
+vis_dat(airquality)
+vis_miss(airquality)
+vis_guess(airquality)
+```
+## After looking at the data, I would say it needs cleaning because 5% of observations were missing, 24% of which were from Ozone and 5% of which were from Solar Radiation. Because removing 5% of observations from the datset should have minimal impacts on the model, I choose to remove n/a values.
+
+
+## Cleaning the data
+```{r}
+library(tidyr)
+library(dplyr)
+library(flextable)
+
+cleaned_airquality <- airquality %>%
+  drop_na(Ozone, Solar.R)
+
+vis_dat(cleaned_airquality)
+
+
+```
+
+# Question 3
+```{r}
+model <- lm(Ozone ~ Temp, data = cleaned_airquality)
+
+
+```
+## I initally chose to use Solar Radiation as my predictor variable. I chose this variable because Ozone concentrations in the atmosphere are correlated with the amount of solar radiation. Because of this established relationship I thought that the resulting model would be valid. The R^2 variable indicated that only 12.13% of the variance in Ozone was exlained by Solar Radiation. After using Temperature instead, another value correlated with Ozone concentration, the R^2 value was much higher and the p-values much lower.
+
+# Question 4
+```{r}
+summary(model)
+shapiro.test(model$residuals)
+```
+## I think this is a valid model because the residuals are all lower than the Solar.R model, the p-values are lower, and the R-squared value is higher.
+
+# Question 5
+## The R^2 variable is represented by two different summary stastics, the Multiple R-Squared and the Adjusted R-Squared. The multipe r-squared is the proportion of variance in the dependent variable explained by the model. In this case, it is 0.488, meaning that 48.8% of the variance in the Ozone can be explained by Temperature. The Adjusted R-squared adjusts for multiple predictors, which is why the two R-Squared values are very similar since there is only one predictor variable. 
+
+# Question 6
+```{r}
+library(broom)
+augmented_airquality <- augment(model)
+head(augmented_airquality)
+```
+
+# Question 7
+```{r}
+library(ggplot2)
+ggplot(augmented_airquality, aes(x = Ozone, y = .fitted)) +
+  geom_point(color = "blue") +  
+  geom_abline(intercept = 0, slope = 1, color = "red") +  
+  labs(
+    title = "Actual vs Predicted Ozone",
+    subtitle = paste("Correlation:", round(cor(augmented_airquality$Ozone, augmented_airquality$.fitted), 2)),
+    x = "Actual Ozone",
+    y = "Predicted Ozone"
+  ) +
+  theme_minimal()
+```
+
