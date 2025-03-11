@@ -1,0 +1,164 @@
+---
+title: "daily_11-12"
+author: "Caitlin Rasbid"
+date: "2024-03-12"
+format: html
+execute: 
+  echo: true
+---
+# Part 1: Normality Testing
+## Question 1
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(broom)
+library(purrr)
+library(visdat)
+
+data(airquality)
+?airquality
+str(airquality)
+summary(airquality)
+glimpse(airquality)
+
+```
+
+This data set represents New York Air Quality measurements including 153 observations of 6 variables such as Ozone, Solar Radiation, Wind, Temperature, and the Month and Day. Some variables are missing records for a given day, with the majority of N/As being for Ozone with 37, then Solar Radiation with 7. All measurements were recorded from May to September 1973. From a brief glance at the variables, Ozone and Solar radiation appear to have the greatest variance from their means, whether this is skewness or outliers. 
+
+## Question 2
+ozone, temp, solar.r, wind
+```{r}
+shapiro.test(airquality$Ozone)
+shapiro.test(airquality$Temp)
+shapiro.test(airquality$Solar.R)
+shapiro.test(airquality$Wind)
+```
+## Question 3
+
+The purpose of the Shapiro-Wilk test is to assess normality of a data set's distribution.
+
+## Question 4
+
+The null hypothesis is that the data is normally distributed, while the alternative hypothesis is that the data is not normally distributed. 
+
+## Question 5
+
+For all variables tested above except for Wind, the p-value was < 0.05. This suggests that for Ozone, Temp, and Solar Radiation that we can reject the null hypothesis that these variables are normally distributed. Wind appears to be normally distributed, since the p-value is > 0.05.
+
+# Part 2: Data Transformation and Feature Engineering
+
+## Question 6
+```{r}
+seasons <- airquality %>%
+  mutate(Season = case_when(
+    Month %in% c("11", "12", "1") ~ "Winter",
+    Month %in% c("2", "3", "4") ~ "Spring",
+    Month %in% c("5", "6", "7") ~ "Summer",
+    Month %in% c("8", "9", "10") ~ "Fall",
+    TRUE ~ "Unknown"
+  ))
+  
+```
+
+## Question 7
+```{r}
+table(seasons$Season)
+```
+
+There are 61 observations of Fall and 92 observations of Summer, which makes sense since the data was recorded between the months of May and September.
+
+# Part 3: Data Preprocessing
+
+## Question 8
+```{r}
+library(recipes)
+
+recipe_obj <- recipe(Ozone ~ Temp + Solar.R + Wind + Season, data = seasons) %>%
+  step_impute_mean(all_numeric_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_factor_predictors())
+
+
+```
+
+## Question 9 
+
+Data normalization is important to pre-processing data for machine learning because it ensures that features contribute equally to model performance by transforming features into a common scale.
+
+## Question 10
+
+The function step_impute_mean() is used to impute missing values with the mean value of that variable.
+
+## Question 11
+```{r}
+prep_recipe <- prep(recipe_obj, training = seasons)
+normalized_data <- bake(prep_recipe, new_data = NULL) %>%
+  drop_na()
+  
+head(normalized_data)
+```
+
+## Question 12
+
+It is important to both prep and bake the recipe because the prep() step estimates parameters for transformations while the bake() step is what actually applies the transformations to the dataset. 
+
+# Part 4: Building a Linear Regression Model
+
+## Question 13
+
+```{r}
+lm_model <- lm(Ozone ~ ., data = normalized_data)
+
+summary(lm_model)
+```
+## Question 14
+The coefficients represent the predicted value of the effect on Ozone of one unit increase in each variable. This means the intercept is 39.815, the predicted Ozone in ppb if all predictors are zero. The impacts of the other variables being increased by one unit is: Temp = 16.376, p < 1.38e-09; Solar.R = 4.857, p < 0.0231; Wind = -10.952, p < 4.98e-06; and Season_Summer = 3.988, p < 0.3441. The next block of values shows the statistical significance of these values with a t-test and p-values, all of the p-values are < 0.05 except for Season_Summer suggesting this is the only variable that the variance in Ozone does not show a statistically significant correlation with. The Adjusted R-squared = 0.5819 which indicates that about 58.19% of the variance in Ozone is explained by the predictor variables. 
+
+# Part 5: Model Diagnostics
+
+## Question 15
+```{r}
+
+pred <- augment(lm_model, normalized_data)
+
+
+```
+
+## Question 16 
+```{r}
+histogram <- ggplot(pred, aes(x = .resid)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black", alpha = 0.7) +
+  labs(title = "Residuals Histogram", x = "Residuals", y = "Frequency") +
+  theme_minimal() 
+  
+print(histogram)
+
+qq <- ggplot(pred, aes(sample = .resid)) +
+  geom_qq() +
+  geom_qq_line() +
+  labs(title = "Residuals QQ Plot") +
+  theme_minimal() 
+  
+print(qq)
+
+```
+
+## Question 17
+```{r}
+library(ggpubr)
+combined_plot <- ggarrange(histogram, qq, ncol = 2, nrow = 1)
+print(combined_plot)
+```
+The above plots both display that the data set is right skewed. The residuals' histogram has a tail on the right side with much more data points concentrated on the left side of the graph. The residuals' QQ plot illustrates the same picture, since the points are not concentrated around the 45 degree angle, but are above the line. 
+
+## Question 18
+
+```{r}
+ggscatter(pred, x = "Ozone", y = ".fitted",
+          add = "reg.line", conf.int = TRUE, cor.coef = TRUE, cor.method = "spearman", ellipse = TRUE)
+```
+## Question 19
+I feel like this model is not the strongest for several factors. First the R = 0.83 with a p < 2.2e-16 suggests that there is a strong correlation between the residuals and the fitted values. Ideally, the residuals should be randomly scattered around zero with no patterns like this. This is also demonstrated visually in the plot, since the residuals are definitely concentrated in one area non-randomly. There must be some predictor missing from the model that is interfering with the relationships between the residuals and the fitted values, so I believe this model could be improved. 
