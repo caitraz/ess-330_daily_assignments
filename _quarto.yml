@@ -1,0 +1,7 @@
+project:
+  title: "ESS-330-Exercises"
+  output-dir: docs
+  type: website
+format:
+  html:
+    self-contained: true
